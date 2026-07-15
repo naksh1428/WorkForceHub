@@ -10,7 +10,7 @@ from typing import Any
 
 import redis
 
-from app.core.config import get_settings
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def get_redis() -> redis.Redis | None:
     if _client is None:
         try:
             _client = redis.Redis.from_url(
-                get_settings().redis_url,
+                settings.REDIS_URL,
                 decode_responses=True,
                 socket_connect_timeout=1,
             )
@@ -62,7 +62,7 @@ class Cache:
             self.client.set(
                 key,
                 json.dumps(value, default=str),
-                ex=ttl or get_settings().cache_ttl_seconds,
+                ex=ttl or settings.CACHE_TTL_SECONDS,
             )
 
     def delete_pattern(self, pattern: str) -> None:

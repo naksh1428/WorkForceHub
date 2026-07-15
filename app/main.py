@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from sqlalchemy.exc import OperationalError
 
 from app.api import auth, departments, employees
-from app.core.config import get_settings
+from app.core.config import settings
 from app.db.cache import get_redis
 from app.db.database import Base, engine
 
@@ -23,8 +23,12 @@ MAX_DB_RETRIES = 10
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # MySQL in Docker can take a few seconds to accept connections;
-    # retry instead of crashing on startup.
+    """Create database tables on startup, retrying while MySQL boots.
+
+    MySQL in Docker can take a few seconds to accept connections after the
+    container starts, so a transient `OperationalError` is retried instead
+    of crashing the app immediately.
+    """
     for attempt in range(1, MAX_DB_RETRIES + 1):
         try:
             Base.metadata.create_all(bind=engine)
@@ -41,7 +45,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
 
-settings = get_settings()
 app = FastAPI(
     title=settings.app_name,
     version=settings.version,
@@ -52,10 +55,9 @@ app = FastAPI(
     ),
     lifespan=lifespan,
 )
-#implementation needed
-#app.include_router(auth.router)
-#app.include_router(employees.router)
-#app.include_router(departments.router)
+app.include_router(auth.router)
+app.include_router(employees.router)
+app.include_router(departments.router)
 
 
 @app.get("/health", tags=["health"])

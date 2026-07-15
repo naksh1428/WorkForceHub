@@ -25,6 +25,10 @@ class Base(DeclarativeBase):
 
 
 def get_db() -> Generator[Session, None, None]:
+    """Yield a database session for a single request, closing it afterwards.
+
+    Intended for use as a FastAPI dependency via `Depends(get_db)`.
+    """
     db = SessionLocal()
     try:
         yield db

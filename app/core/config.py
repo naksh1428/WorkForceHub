@@ -15,12 +15,10 @@ class Settings(BaseSettings):
     version: str = "1.0.0"
     DATABASE_URL: str
     REDIS_URL: str
-    CACHE_TTL_SECONDS: int
+    CACHE_TTL_SECONDS: int = 300
     JWT_SECRET_KEY: str
-    JWT_ALGORITHM: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int
-
-    #model_config = {"env_file": ".env"}
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
 
 settings = Settings()
