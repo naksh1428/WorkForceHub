@@ -1,8 +1,4 @@
-"""SQLAlchemy engine, session factory and FastAPI dependency.
-
-Defaults to MySQL (PyMySQL driver). SQLite is still supported via
-DATABASE_URL for lightweight local runs and is used by the test suite.
-"""
+"""Database engine and session setup."""
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
@@ -25,10 +21,7 @@ class Base(DeclarativeBase):
 
 
 def get_db() -> Generator[Session, None, None]:
-    """Yield a database session for a single request, closing it afterwards.
-
-    Intended for use as a FastAPI dependency via `Depends(get_db)`.
-    """
+    """Give each request its own DB session and close it after."""
     db = SessionLocal()
     try:
         yield db

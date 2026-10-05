@@ -1,4 +1,4 @@
-"""Department endpoints: list with employee counts (cached), create, delete."""
+"""Department endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -22,15 +22,7 @@ def list_departments(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> list[DepartmentResponse]:
-    """List all departments with a live count of their employees.
-
-    Args:
-        db: Database session, injected.
-        cache: Redis cache wrapper, injected.
-
-    Returns:
-        All departments ordered by id, each annotated with `employee_count`.
-    """
+    """List all departments with their employee counts."""
     cached = cache.get(CACHE_KEY_ALL)
     if cached is not None:
         return [DepartmentResponse(**item) for item in cached]
@@ -57,19 +49,7 @@ def create_department(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> DepartmentResponse:
-    """Create a new department.
-
-    Args:
-        payload: Department name.
-        db: Database session, injected.
-        cache: Redis cache wrapper, injected.
-
-    Returns:
-        The created department (`employee_count` starts at 0).
-
-    Raises:
-        HTTPException: 409 Conflict if a department with that name already exists.
-    """
+    """Create a department. 409 if the name already exists."""
     department = Department(name=payload.name)
     db.add(department)
     try:
@@ -92,16 +72,7 @@ def delete_department(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> None:
-    """Delete a department along with all of its employees.
-
-    Args:
-        department_id: Primary key of the department to remove.
-        db: Database session, injected.
-        cache: Redis cache wrapper, injected.
-
-    Raises:
-        HTTPException: 404 Not Found if no department with that id exists.
-    """
+    """Delete a department and all its employees. 404 if not found."""
     department = db.get(Department, department_id)
     if department is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")

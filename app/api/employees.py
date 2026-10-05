@@ -1,10 +1,4 @@
-"""Employee endpoints: paginated list, create, get, update, delete.
-
-Caching strategy: `GET` responses are cached in Redis (`employees:id:{id}`,
-`employees:list:{page}:{page_size}:{department_id}:{search}`). Any write
-(POST/PATCH/DELETE) invalidates the affected key patterns so subsequent
-reads never observe stale data.
-"""
+"""Employee endpoints. GET results are cached in Redis and cleared on every write."""
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -28,23 +22,19 @@ DEPARTMENTS_CACHE_KEY = "departments:all"
 
 
 def _employee_cache_key(employee_id: int) -> str:
-    """Build the cache key for a single employee lookup."""
+    """Cache key for one employee."""
     return f"employees:id:{employee_id}"
 
 
 def _list_cache_key(
     page: int, page_size: int, department_id: int | None, search: str | None
 ) -> str:
-    """Build a cache key that uniquely identifies one list query's parameters."""
+    """Cache key for one list query."""
     return f"employees:list:{page}:{page_size}:{department_id}:{search or ''}"
 
 
 def _invalidate_employee_caches(cache: Cache, employee_id: int | None = None) -> None:
-    """Invalidate list caches (and optionally a single-employee cache).
-
-    Called after any write so reads are always consistent. Also invalidates
-    the departments cache, since department employee counts change too.
-    """
+    """Clear employee and department caches after a write."""
     if employee_id is not None:
         cache.delete_pattern(_employee_cache_key(employee_id))
     cache.delete_pattern(LIST_CACHE_PATTERN)
@@ -63,19 +53,7 @@ def list_employees(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> PaginatedEmployees:
-    """List employees with pagination, optional department filter and search.
-
-    Args:
-        page: 1-indexed page number.
-        page_size: Number of employees per page (1-100).
-        department_id: If given, only employees in this department are returned.
-        search: If given, filters on first name, last name or email (ILIKE).
-        db: Database session, injected.
-        cache: Redis cache wrapper, injected.
-
-    Returns:
-        A page of employees plus pagination metadata (`total`, `page`, `page_size`).
-    """
+    """List employees, with paging, department filter and search."""
     cache_key = _list_cache_key(page, page_size, department_id, search)
     cached = cache.get(cache_key)
     if cached is not None:
@@ -114,20 +92,7 @@ def create_employee(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> EmployeeResponse:
-    """Create a new employee.
-
-    Args:
-        payload: New employee's details, including its department id.
-        db: Database session, injected.
-        cache: Redis cache wrapper, injected.
-
-    Returns:
-        The created employee.
-
-    Raises:
-        HTTPException: 404 Not Found if the given department doesn't exist.
-        HTTPException: 409 Conflict if the email is already in use.
-    """
+    """Create an employee. 404 if department is missing, 409 if email is taken."""
     if db.get(Department, payload.department_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
 
@@ -153,19 +118,7 @@ def get_employee(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> EmployeeResponse:
-    """Fetch a single employee by id, served from cache when available.
-
-    Args:
-        employee_id: Primary key of the employee to fetch.
-        db: Database session, injected.
-        cache: Redis cache wrapper, injected.
-
-    Returns:
-        The matching employee.
-
-    Raises:
-        HTTPException: 404 Not Found if no employee with that id exists.
-    """
+    """Get one employee by id. 404 if not found."""
     cache_key = _employee_cache_key(employee_id)
     cached = cache.get(cache_key)
     if cached is not None:
@@ -188,23 +141,7 @@ def update_employee(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> EmployeeResponse:
-    """Partially update an employee; only fields present in the payload change.
-
-    Args:
-        employee_id: Primary key of the employee to update.
-        payload: Subset of employee fields to overwrite. Fields omitted from
-            the request body are left untouched (standard PATCH semantics).
-        db: Database session, injected.
-        cache: Redis cache wrapper, injected.
-
-    Returns:
-        The updated employee.
-
-    Raises:
-        HTTPException: 404 Not Found if the employee, or (when being
-            changed) the new department, doesn't exist.
-        HTTPException: 409 Conflict if the new email is already in use.
-    """
+    """Update only the fields sent. 404 if employee/department is missing, 409 if email is taken."""
     employee = db.get(Employee, employee_id)
     if employee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
@@ -236,16 +173,7 @@ def delete_employee(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> None:
-    """Delete an employee.
-
-    Args:
-        employee_id: Primary key of the employee to remove.
-        db: Database session, injected.
-        cache: Redis cache wrapper, injected.
-
-    Raises:
-        HTTPException: 404 Not Found if no employee with that id exists.
-    """
+    """Delete an employee. 404 if not found."""
     employee = db.get(Employee, employee_id)
     if employee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")

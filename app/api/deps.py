@@ -1,4 +1,4 @@
-"""Shared FastAPI dependencies for the API routers."""
+"""Shared API dependencies."""
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -15,19 +15,7 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    """Resolve the authenticated user from the request's bearer token.
-
-    Args:
-        token: JWT bearer token extracted from the `Authorization` header.
-        db: Database session, injected.
-
-    Returns:
-        The `User` row matching the token's subject claim.
-
-    Raises:
-        HTTPException: 401 Unauthorized if the token is missing, invalid,
-            expired, or no longer matches an existing user.
-    """
+    """Get the logged-in user from the bearer token. 401 if invalid."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

@@ -1,8 +1,4 @@
-"""Redis cache layer with graceful fallback.
-
-If Redis is unreachable the API keeps working without caching, so the
-project runs locally even before docker-compose / Redis is started.
-"""
+"""Redis cache. If Redis is down, the app just runs without caching."""
 import contextlib
 import json
 import logging
@@ -18,7 +14,7 @@ _client: redis.Redis | None = None
 
 
 def get_redis() -> redis.Redis | None:
-    """Return a Redis client, or None if Redis is unavailable."""
+    """Return the Redis client, or None if Redis is down."""
     global _client
     if _client is None:
         try:
@@ -35,13 +31,13 @@ def get_redis() -> redis.Redis | None:
 
 
 def set_client(client: redis.Redis | None) -> None:
-    """Inject a client (used by tests with fakeredis)."""
+    """Swap in a Redis client (used by tests)."""
     global _client
     _client = client
 
 
 class Cache:
-    """Thin JSON cache wrapper around Redis."""
+    """Simple JSON cache on top of Redis."""
 
     def __init__(self, client: redis.Redis | None) -> None:
         self.client = client
@@ -66,7 +62,7 @@ class Cache:
             )
 
     def delete_pattern(self, pattern: str) -> None:
-        """Invalidate all keys matching a pattern (e.g. employees:*)."""
+        """Delete all keys matching a pattern, e.g. employees:*."""
         if self.client is None:
             return
         try:

@@ -14,19 +14,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)) -> Token:
-    """Create a new user account and return a JWT for immediate use.
-
-    Args:
-        payload: Desired username and plain-text password. The password is
-            hashed with PBKDF2-SHA256 before being stored.
-        db: Database session, injected.
-
-    Returns:
-        A bearer token for the newly created user.
-
-    Raises:
-        HTTPException: 409 Conflict if the username is already taken.
-    """
+    """Sign up a new user and return a token. 409 if username is taken."""
     user = User(username=payload.username, hashed_password=hash_password(payload.password))
     db.add(user)
     try:
@@ -45,20 +33,7 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> Token:
-    """Authenticate a user via the OAuth2 password flow and return a JWT.
-
-    Args:
-        form_data: OAuth2 form data containing `username` and `password`
-            (submitted as `application/x-www-form-urlencoded`, not JSON).
-        db: Database session, injected.
-
-    Returns:
-        A bearer token for the authenticated user.
-
-    Raises:
-        HTTPException: 401 Unauthorized if the username doesn't exist or
-            the password is incorrect.
-    """
+    """Log in with username/password (form data) and return a token. 401 on bad credentials."""
     user = db.query(User).filter(User.username == form_data.username).first()
     if user is None or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
