@@ -1,4 +1,8 @@
-"""Employee endpoints. GET results are cached in Redis and cleared on every write."""
+"""Routes for working with employees.
+
+Results from reading data are saved in Redis so repeat requests are faster.
+That saved data is cleared whenever something is added, changed or removed.
+"""
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -22,19 +26,19 @@ DEPARTMENTS_CACHE_KEY = "departments:all"
 
 
 def _employee_cache_key(employee_id: int) -> str:
-    """Cache key for one employee."""
+    """Name used to save one employee in the cache."""
     return f"employees:id:{employee_id}"
 
 
 def _list_cache_key(
     page: int, page_size: int, department_id: int | None, search: str | None
 ) -> str:
-    """Cache key for one list query."""
+    """Name used to save one page of search results in the cache."""
     return f"employees:list:{page}:{page_size}:{department_id}:{search or ''}"
 
 
 def _invalidate_employee_caches(cache: Cache, employee_id: int | None = None) -> None:
-    """Clear employee and department caches after a write."""
+    """Throw away saved employee and department data so it is not out of date."""
     if employee_id is not None:
         cache.delete_pattern(_employee_cache_key(employee_id))
     cache.delete_pattern(LIST_CACHE_PATTERN)
@@ -43,17 +47,20 @@ def _invalidate_employee_caches(cache: Cache, employee_id: int | None = None) ->
 
 @router.get("", response_model=PaginatedEmployees)
 def list_employees(
-    page: int = Query(1, ge=1, description="1-indexed page number"),
-    page_size: int = Query(10, ge=1, le=100, description="Items per page (max 100)"),
-    department_id: int | None = Query(None, description="Filter by department id"),
+    page: int = Query(1, ge=1, description="Page number, starting at 1"),
+    page_size: int = Query(10, ge=1, le=100, description="Employees per page (up to 100)"),
+    department_id: int | None = Query(None, description="Only this department"),
     search: str | None = Query(
-        None, description="Case-insensitive match on first name, last name or email"
+        None, description="Search by first name, last name or email (any case)"
     ),
     db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> PaginatedEmployees:
-    """List employees, with paging, department filter and search."""
+    """Show employees one page at a time.
+
+    You can also pick a department or search by name or email.
+    """
     cache_key = _list_cache_key(page, page_size, department_id, search)
     cached = cache.get(cache_key)
     if cached is not None:
@@ -92,7 +99,11 @@ def create_employee(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> EmployeeResponse:
-    """Create an employee. 404 if department is missing, 409 if email is taken."""
+    """Add a new employee.
+
+    Fails with 404 if the department does not exist,
+    or 409 if another employee already uses this email.
+    """
     if db.get(Department, payload.department_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
 
@@ -118,7 +129,10 @@ def get_employee(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> EmployeeResponse:
-    """Get one employee by id. 404 if not found."""
+    """Show one employee by their id.
+
+    Fails with 404 if the employee does not exist.
+    """
     cache_key = _employee_cache_key(employee_id)
     cached = cache.get(cache_key)
     if cached is not None:
@@ -141,7 +155,11 @@ def update_employee(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> EmployeeResponse:
-    """Update only the fields sent. 404 if employee/department is missing, 409 if email is taken."""
+    """Change some details of an employee. Only the fields you send are changed.
+
+    Fails with 404 if the employee or the new department does not exist,
+    or 409 if another employee already uses this email.
+    """
     employee = db.get(Employee, employee_id)
     if employee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
@@ -173,7 +191,10 @@ def delete_employee(
     cache: Cache = Depends(get_cache),
     _: User = Depends(get_current_user),
 ) -> None:
-    """Delete an employee. 404 if not found."""
+    """Remove an employee.
+
+    Fails with 404 if the employee does not exist.
+    """
     employee = db.get(Employee, employee_id)
     if employee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")

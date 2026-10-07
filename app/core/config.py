@@ -1,11 +1,11 @@
-"""App settings from environment variables."""
+"""App settings, read from environment variables."""
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """App settings; override any value with an env var or .env file."""
+    """All app settings. Change any of them with an environment variable or the .env file."""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     app_name: str = "Employee Management API"
     version: str = "1.0.0"

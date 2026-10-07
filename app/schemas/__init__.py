@@ -1,1 +1,1 @@
-"""Pydantic schemas package."""
+"""Request and response data shapes live in this folder."""

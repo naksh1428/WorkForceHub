@@ -1,1 +1,1 @@
-"""API routers package."""
+"""All the API routes live in this folder."""

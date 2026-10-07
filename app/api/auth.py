@@ -1,4 +1,4 @@
-"""Authentication endpoints: register and login."""
+"""Routes for signing up and logging in."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import IntegrityError
@@ -14,7 +14,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)) -> Token:
-    """Sign up a new user and return a token. 409 if username is taken."""
+    """Create a new user account and give back a login token.
+
+    Fails with 409 if someone already has this username.
+    """
     user = User(username=payload.username, hashed_password=hash_password(payload.password))
     db.add(user)
     try:
@@ -33,7 +36,10 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> Token:
-    """Log in with username/password (form data) and return a token. 401 on bad credentials."""
+    """Check the username and password, then give back a login token.
+
+    Fails with 401 if the username or password is wrong.
+    """
     user = db.query(User).filter(User.username == form_data.username).first()
     if user is None or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(

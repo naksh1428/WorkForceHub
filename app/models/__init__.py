@@ -1,1 +1,1 @@
-"""ORM models package."""
+"""Database table classes live in this folder."""

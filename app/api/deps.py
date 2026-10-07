@@ -1,4 +1,4 @@
-"""Shared API dependencies."""
+"""Helpers that many routes share."""
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -7,7 +7,7 @@ from app.core.security import decode_access_token
 from app.db.database import get_db
 from app.models.models import User
 
-# tokenUrl points Swagger UI's "Authorize" button at the login endpoint.
+# Tells the "Authorize" button on the /docs page where to log in.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
@@ -15,7 +15,10 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    """Get the logged-in user from the bearer token. 401 if invalid."""
+    """Find out which user is making the request, using their login token.
+
+    Fails with 401 if the token is missing, wrong or expired.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

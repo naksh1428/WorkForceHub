@@ -1,4 +1,7 @@
-"""Redis cache. If Redis is down, the app just runs without caching."""
+"""Saves results in Redis so the app can answer faster.
+
+If Redis is not running, the app still works, just without this speed-up.
+"""
 import contextlib
 import json
 import logging
@@ -14,7 +17,7 @@ _client: redis.Redis | None = None
 
 
 def get_redis() -> redis.Redis | None:
-    """Return the Redis client, or None if Redis is down."""
+    """Connect to Redis. Gives back None if Redis is not running."""
     global _client
     if _client is None:
         try:
@@ -31,18 +34,19 @@ def get_redis() -> redis.Redis | None:
 
 
 def set_client(client: redis.Redis | None) -> None:
-    """Swap in a Redis client (used by tests)."""
+    """Use a different Redis connection. Handy for tests."""
     global _client
     _client = client
 
 
 class Cache:
-    """Simple JSON cache on top of Redis."""
+    """A small helper to save, read and clear data in Redis."""
 
     def __init__(self, client: redis.Redis | None) -> None:
         self.client = client
 
     def get(self, key: str) -> Any | None:
+        """Read saved data. Gives back None if nothing is saved."""
         if self.client is None:
             return None
         try:
@@ -52,6 +56,7 @@ class Cache:
             return None
 
     def set(self, key: str, value: Any, ttl: int | None = None) -> None:
+        """Save data for a while (ttl seconds) before it is thrown away."""
         if self.client is None:
             return
         with contextlib.suppress(redis.RedisError):
@@ -62,7 +67,7 @@ class Cache:
             )
 
     def delete_pattern(self, pattern: str) -> None:
-        """Delete all keys matching a pattern, e.g. employees:*."""
+        """Remove all saved data whose name matches a pattern, like employees:*."""
         if self.client is None:
             return
         try:
@@ -74,4 +79,5 @@ class Cache:
 
 
 def get_cache() -> Cache:
+    """Give a route a ready-to-use cache helper."""
     return Cache(get_redis())

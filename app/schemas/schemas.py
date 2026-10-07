@@ -1,4 +1,4 @@
-"""Request and response schemas."""
+"""Shapes of the data the API takes in and sends back."""
 from datetime import date
 from decimal import Decimal
 
@@ -10,14 +10,14 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserCreate(BaseModel):
-    """Sign-up request."""
+    """What you send to create an account."""
 
     username: str = Field(min_length=3, max_length=150)
-    password: str = Field(min_length=8, description="Plain-text password; hashed before storage.")
+    password: str = Field(min_length=8, description="Your password. It is scrambled before saving.")
 
 
 class Token(BaseModel):
-    """Login token response."""
+    """The login token you get back after signing up or logging in."""
 
     access_token: str
     token_type: str = "bearer"
@@ -29,13 +29,13 @@ class Token(BaseModel):
 
 
 class DepartmentCreate(BaseModel):
-    """Create-department request."""
+    """What you send to add a department."""
 
     name: str = Field(min_length=1, max_length=150)
 
 
 class DepartmentResponse(BaseModel):
-    """Department with its employee count."""
+    """A department and how many employees it has."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,7 +50,7 @@ class DepartmentResponse(BaseModel):
 
 
 class EmployeeBase(BaseModel):
-    """Common employee fields."""
+    """Details every employee has."""
 
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
@@ -62,11 +62,11 @@ class EmployeeBase(BaseModel):
 
 
 class EmployeeCreate(EmployeeBase):
-    """Create-employee request."""
+    """What you send to add an employee."""
 
 
 class EmployeeUpdate(BaseModel):
-    """Update-employee request; send only the fields to change."""
+    """What you send to change an employee. Only send the fields you want to change."""
 
     first_name: str | None = Field(default=None, min_length=1, max_length=100)
     last_name: str | None = Field(default=None, min_length=1, max_length=100)
@@ -78,7 +78,7 @@ class EmployeeUpdate(BaseModel):
 
 
 class EmployeeResponse(EmployeeBase):
-    """Employee returned by the API."""
+    """An employee as the API sends it back."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -86,7 +86,7 @@ class EmployeeResponse(EmployeeBase):
 
 
 class PaginatedEmployees(BaseModel):
-    """One page of employees with paging info."""
+    """One page of employees, plus the total count and page details."""
 
     items: list[EmployeeResponse]
     total: int

@@ -1,4 +1,7 @@
-"""App entrypoint. Run with: uvicorn app.main:app --reload"""
+"""Starting point of the app.
+
+Run it with: uvicorn app.main:app --reload
+"""
 import logging
 import time
 from collections.abc import AsyncGenerator
@@ -18,7 +21,10 @@ MAX_DB_RETRIES = 10
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Create tables on startup, retrying while the database starts up."""
+    """Create the database tables when the app starts.
+
+    If the database is still starting up, wait and try again a few times.
+    """
     for attempt in range(1, MAX_DB_RETRIES + 1):
         try:
             Base.metadata.create_all(bind=engine)
@@ -52,6 +58,6 @@ app.include_router(departments.router)
 
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
-    """Health check for the API and Redis."""
+    """Quick check to see if the app and Redis are running."""
     redis_status = "up" if get_redis() is not None else "down"
     return {"api": "up", "redis": redis_status}

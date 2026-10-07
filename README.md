@@ -1,126 +1,141 @@
 # Employee Management API
 
-A production-style REST API for managing employees and departments, built with **FastAPI**, **MySQL** (SQLAlchemy 2.0) and **Redis caching**. JWT-secured, fully tested, linted, type-checked and shipped with CI/CD.
+A simple web API to keep track of employees and the departments they work in.
 
-## Features
+It is built with **FastAPI**, stores data in **MySQL**, and uses **Redis** to make repeat requests faster. You need to log in to use it.
 
-- **JWT authentication** — register/login, all business endpoints protected
-- **Employee CRUD** — create, read, update (PATCH), delete
-- **Departments** — with live employee counts
-- **Pagination, filtering & search** — `?page=`, `?page_size=`, `?department_id=`, `?search=`
-- **Redis caching** — GET responses cached with TTL, automatically invalidated on writes; graceful fallback if Redis is down (API keeps working)
-- **Validation & error handling** — Pydantic v2 schemas, correct HTTP status codes (401/404/409/422)
-- **MySQL persistence** — SQLAlchemy 2.0 ORM with connection pooling (`pool_pre_ping`, `pool_recycle`) and startup retry while MySQL boots
-- **Quality standards** — typed code, ruff linting, pytest suite (21 tests), GitHub Actions CI
-- **Auto-generated docs** — Swagger UI at `/docs`, OpenAPI at `/openapi.json`
+## What it can do
 
-## Architecture
+- **Sign up and log in.** You get a token after logging in. Send this token with every other request.
+- **Manage employees.** Add, view, change and remove employees.
+- **Manage departments.** Add, list and remove departments. The list shows how many employees each department has.
+- **Page through and search.** Get employees one page at a time, only from one department, or search by name or email.
+- **Faster repeat requests.** Results are saved in Redis for a short time. When something changes, the saved results are cleared so you never see old data. If Redis is not running, the app still works, just a bit slower.
+- **Clear errors.** Bad input or missing items give back clear error messages and the right status code.
+- **Built-in docs.** Open `/docs` in your browser to see and try every route.
+
+## How the code is organised
 
 ```
 app/
-├── main.py            # FastAPI app, routers, lifespan (creates tables)
+├── main.py            # Starts the app and creates the database tables
 ├── core/
-│   ├── config.py      # Settings from env vars (pydantic-settings)
-│   └── security.py    # Password hashing (passlib) + JWT (PyJWT)
+│   ├── config.py      # Reads settings from environment variables
+│   └── security.py    # Password scrambling and login tokens
 ├── db/
-│   ├── database.py    # SQLAlchemy engine, session, Base
-│   └── cache.py       # Redis wrapper: get/set/invalidate, fallback if down
-├── models/models.py   # ORM models: User, Department, Employee
-├── schemas/schemas.py # Pydantic request/response schemas
+│   ├── database.py    # Connects to the database
+│   └── cache.py       # Saves and clears data in Redis
+├── models/models.py   # Database tables: User, Department, Employee
+├── schemas/schemas.py # Shapes of the data going in and out
 └── api/
-    ├── deps.py        # get_current_user auth dependency
-    ├── auth.py        # /auth/register, /auth/login
-    ├── employees.py   # /employees CRUD + pagination + caching
-    └── departments.py # /departments CRUD + caching
-tests/                 # pytest suite (auth, CRUD, caching, validation)
+    ├── deps.py        # Finds the logged-in user from the token
+    ├── auth.py        # /auth/register and /auth/login
+    ├── employees.py   # /employees routes
+    └── departments.py # /departments routes
 ```
 
-**Caching strategy:** read endpoints check Redis first (`employees:id:{id}`, `employees:list:{...}`, `departments:all`). Any write (POST/PATCH/DELETE) invalidates the affected key patterns, so reads are always consistent.
+**How saving in Redis works:** when you read data, the app first looks in Redis. If it finds it there, it sends it straight back. If not, it reads from the database and saves a copy in Redis. Any add, change or delete clears the related saved copies.
 
-## Quick start
+## Getting started
 
-### Option 1 — Docker (API + MySQL + Redis) — recommended
+### Option 1: Docker (easiest)
+
+This starts the API, MySQL and Redis together.
 
 ```bash
 docker compose up --build
-# API:  http://localhost:8000
-# Docs: http://localhost:8000/docs
-# MySQL 8.4 and Redis start automatically; the API waits for MySQL health.
 ```
 
-### Option 2 — Local
+- API: http://localhost:8000
+- Docs: http://localhost:8000/docs
+
+The API waits until MySQL is ready before it starts.
+
+### Option 2: Run it on your own machine
+
+1. Install the packages:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Copy the example settings and change them to match your setup:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Make sure MySQL is running and the database exists:
+
+   ```sql
+   CREATE DATABASE employee_db;
+   ```
+
+   Want to skip MySQL? Use SQLite instead by setting this in `.env`:
+   `DATABASE_URL=sqlite:///./employees.db`
+
+4. Start the app:
+
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+## Try it out
 
 ```bash
-pip install -r requirements-dev.txt
-# Point at your own MySQL (create the database first):
-#   CREATE DATABASE employee_db;
-export DATABASE_URL="mysql+pymysql://user:pass@localhost:3306/employee_db"
-uvicorn app.main:app --reload
-# Tip: for a quick dependency-free run use SQLite instead:
-#   export DATABASE_URL="sqlite:///./employees.db"
-```
-
-## Usage example
-
-```bash
-# 1. Register (returns a JWT)
+# 1. Sign up (you get a token back)
 curl -X POST localhost:8000/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "supersecret1"}'
 
-# 2. Create a department
+# 2. Add a department
 curl -X POST localhost:8000/departments \
   -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" \
   -d '{"name": "Engineering"}'
 
-# 3. Create an employee
+# 3. Add an employee
 curl -X POST localhost:8000/employees \
   -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" \
   -d '{"first_name":"Jane","last_name":"Doe","email":"jane@example.com","job_title":"Python Developer","salary":55000,"hire_date":"2024-01-15","department_id":1}'
 
-# 4. Search with pagination
+# 4. Search employees, 10 per page
 curl "localhost:8000/employees?search=doe&page=1&page_size=10" \
   -H "Authorization: Bearer <TOKEN>"
 ```
 
-## Running tests & checks
+Replace `<TOKEN>` with the token you got in step 1.
 
-```bash
-pytest -v          # 21 tests; run against in-memory SQLite + fakeredis
-                   # so CI needs no database server and stays fast
-ruff check app tests
-mypy app
-```
+## All routes
 
-CI runs all three automatically on every push and pull request (see `.github/workflows/ci.yml`).
+| Method | Path              | What it does                                 | Login needed |
+|--------|-------------------|----------------------------------------------|--------------|
+| POST   | /auth/register    | Create an account and get a token            | No           |
+| POST   | /auth/login       | Log in and get a token                       | No           |
+| GET    | /employees        | List employees (pages, filter, search)       | Yes          |
+| POST   | /employees        | Add an employee                              | Yes          |
+| GET    | /employees/{id}   | Show one employee                            | Yes          |
+| PATCH  | /employees/{id}   | Change some details of an employee           | Yes          |
+| DELETE | /employees/{id}   | Remove an employee                           | Yes          |
+| GET    | /departments      | List departments with employee counts        | Yes          |
+| POST   | /departments      | Add a department                             | Yes          |
+| DELETE | /departments/{id} | Remove a department and all its employees    | Yes          |
+| GET    | /health           | Check if the app and Redis are running       | No           |
 
-## API reference
+## Settings
 
-| Method | Path                 | Description                          | Auth |
-|--------|----------------------|--------------------------------------|------|
-| POST   | /auth/register       | Create user, returns JWT             | –    |
-| POST   | /auth/login          | Login (OAuth2 form), returns JWT     | –    |
-| GET    | /employees           | List (paginated, filter, search)     | ✔    |
-| POST   | /employees           | Create employee                      | ✔    |
-| GET    | /employees/{id}      | Get employee (cached)                | ✔    |
-| PATCH  | /employees/{id}      | Partial update (invalidates cache)   | ✔    |
-| DELETE | /employees/{id}      | Delete (invalidates cache)           | ✔    |
-| GET    | /departments         | List with employee counts (cached)   | ✔    |
-| POST   | /departments         | Create department                    | ✔    |
-| DELETE | /departments/{id}    | Delete department + its employees    | ✔    |
-| GET    | /health              | API + Redis status                   | –    |
+Set these as environment variables or in a `.env` file (see `.env.example`).
 
-## Configuration
+| Name                        | Required | Default | What it is for                              |
+|-----------------------------|----------|---------|---------------------------------------------|
+| DATABASE_URL                | Yes      | –       | Where the database is                       |
+| REDIS_URL                   | Yes      | –       | Where Redis is                              |
+| JWT_SECRET_KEY              | Yes      | –       | Secret used to sign login tokens            |
+| JWT_ALGORITHM               | No       | HS256   | How login tokens are signed                 |
+| ACCESS_TOKEN_EXPIRE_MINUTES | No       | 30      | How long a login token works                |
+| CACHE_TTL_SECONDS           | No       | 300     | How long results stay saved in Redis        |
 
-All settings come from environment variables (see `.env.example`):
+Always use your own strong `JWT_SECRET_KEY` in production.
 
-| Variable            | Default                      | Purpose                  |
-|---------------------|------------------------------|--------------------------|
-| DATABASE_URL        | mysql+pymysql://...:3306/employee_db | Any SQLAlchemy URL |
-| REDIS_URL           | redis://localhost:6379/0     | Redis connection         |
-| JWT_SECRET_KEY      | change-me-in-production      | Token signing key        |
-| CACHE_TTL_SECONDS   | 300                          | Cache expiry             |
+## Built with
 
-## Tech stack
-
-Python 3.11+ · FastAPI · MySQL 8 (PyMySQL) · SQLAlchemy 2.0 · Pydantic v2 · Redis · PyJWT · passlib · pytest · fakeredis · ruff · mypy · GitHub Actions · Docker
+Python 3.11+ · FastAPI · MySQL 8 · SQLAlchemy 2.0 · Pydantic v2 · Redis · PyJWT · passlib · Docker
