@@ -1,9 +1,4 @@
-"""Application entrypoint.
-
-Run locally:
-    uvicorn app.main:app --reload
-Interactive docs: http://localhost:8000/docs
-"""
+"""App entrypoint. Run with: uvicorn app.main:app --reload"""
 import logging
 import time
 from collections.abc import AsyncGenerator
@@ -23,12 +18,7 @@ MAX_DB_RETRIES = 10
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Create database tables on startup, retrying while MySQL boots.
-
-    MySQL in Docker can take a few seconds to accept connections after the
-    container starts, so a transient `OperationalError` is retried instead
-    of crashing the app immediately.
-    """
+    """Create tables on startup, retrying while the database starts up."""
     for attempt in range(1, MAX_DB_RETRIES + 1):
         try:
             Base.metadata.create_all(bind=engine)
@@ -62,6 +52,6 @@ app.include_router(departments.router)
 
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
-    """Liveness probe: reports API and Redis status."""
+    """Health check for the API and Redis."""
     redis_status = "up" if get_redis() is not None else "down"
     return {"api": "up", "redis": redis_status}

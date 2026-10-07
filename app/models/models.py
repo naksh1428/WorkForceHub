@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models: User, Department, Employee."""
+"""Database models."""
 from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, func
@@ -8,7 +8,7 @@ from app.db.database import Base
 
 
 class User(Base):
-    """An application user allowed to authenticate and call the API."""
+    """A user who can log in."""
 
     __tablename__ = "users"
 
@@ -19,7 +19,7 @@ class User(Base):
 
 
 class Department(Base):
-    """A department that employees belong to."""
+    """A department."""
 
     __tablename__ = "departments"
 
@@ -32,7 +32,7 @@ class Department(Base):
 
 
 class Employee(Base):
-    """An employee record belonging to exactly one department."""
+    """An employee in one department."""
 
     __tablename__ = "employees"
 

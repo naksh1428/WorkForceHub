@@ -1,4 +1,4 @@
-"""Pydantic request/response schemas."""
+"""Request and response schemas."""
 from datetime import date
 from decimal import Decimal
 
@@ -10,14 +10,14 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserCreate(BaseModel):
-    """Request body for POST /auth/register."""
+    """Sign-up request."""
 
     username: str = Field(min_length=3, max_length=150)
     password: str = Field(min_length=8, description="Plain-text password; hashed before storage.")
 
 
 class Token(BaseModel):
-    """JWT bearer token returned by /auth/register and /auth/login."""
+    """Login token response."""
 
     access_token: str
     token_type: str = "bearer"
@@ -29,13 +29,13 @@ class Token(BaseModel):
 
 
 class DepartmentCreate(BaseModel):
-    """Request body for POST /departments."""
+    """Create-department request."""
 
     name: str = Field(min_length=1, max_length=150)
 
 
 class DepartmentResponse(BaseModel):
-    """Department representation, annotated with a live employee count."""
+    """Department with its employee count."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,7 +50,7 @@ class DepartmentResponse(BaseModel):
 
 
 class EmployeeBase(BaseModel):
-    """Fields shared by the employee create/response schemas."""
+    """Common employee fields."""
 
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
@@ -62,15 +62,11 @@ class EmployeeBase(BaseModel):
 
 
 class EmployeeCreate(EmployeeBase):
-    """Request body for POST /employees."""
+    """Create-employee request."""
 
 
 class EmployeeUpdate(BaseModel):
-    """Request body for PATCH /employees/{id}. All fields are optional.
-
-    Only fields explicitly present in the request are applied; omitted
-    fields leave the existing value untouched.
-    """
+    """Update-employee request; send only the fields to change."""
 
     first_name: str | None = Field(default=None, min_length=1, max_length=100)
     last_name: str | None = Field(default=None, min_length=1, max_length=100)
@@ -82,7 +78,7 @@ class EmployeeUpdate(BaseModel):
 
 
 class EmployeeResponse(EmployeeBase):
-    """Full employee representation returned by the API."""
+    """Employee returned by the API."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -90,7 +86,7 @@ class EmployeeResponse(EmployeeBase):
 
 
 class PaginatedEmployees(BaseModel):
-    """A page of employees plus metadata for client-side paging."""
+    """One page of employees with paging info."""
 
     items: list[EmployeeResponse]
     total: int
