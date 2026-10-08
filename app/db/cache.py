@@ -5,6 +5,7 @@ If Redis is not running, the app still works, just without this speed-up.
 import contextlib
 import json
 import logging
+import time
 from typing import Any
 
 import redis
@@ -14,12 +15,21 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 _client: redis.Redis | None = None
+_last_failure: float | None = None
+# After a failed connect, wait this long before trying Redis again
+RETRY_AFTER_SECONDS = 30
 
 
 def get_redis() -> redis.Redis | None:
-    """Connect to Redis. Gives back None if Redis is not running."""
-    global _client
-    if _client is None:
+    """Connect to Redis. Gives back None if Redis is not running.
+
+    After a failed try, it waits RETRY_AFTER_SECONDS before trying again,
+    so requests are not slowed down while Redis is down.
+    """
+    global _client, _last_failure
+    if _client is None and (
+        _last_failure is None or time.monotonic() - _last_failure > RETRY_AFTER_SECONDS
+    ):
         try:
             _client = redis.Redis.from_url(
                 settings.REDIS_URL,
@@ -30,6 +40,7 @@ def get_redis() -> redis.Redis | None:
         except redis.RedisError:
             logger.warning("Redis unavailable - running without cache")
             _client = None
+            _last_failure = time.monotonic()
     return _client
 
 

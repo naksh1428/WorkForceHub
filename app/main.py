@@ -2,8 +2,8 @@
 
 Run it with: uvicorn app.main:app --reload
 """
+import asyncio
 import logging
-import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 attempt,
                 MAX_DB_RETRIES,
             )
-            time.sleep(2)
+            await asyncio.sleep(2)
     yield
 
 
